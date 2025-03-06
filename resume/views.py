@@ -7,6 +7,9 @@ from .serializers import JobDescriptionSerializer, JDResultSerializer, ResumeSer
 from .utils import extract_text_from_pdf, extract_text_from_doc, assign_weightage_to_skills, extract_name_from_text, extract_text_from_xlsx, process_with_hr_ai, is_generated_by_ai
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
+import re
+import subprocess
+import json
 
 
 
@@ -77,6 +80,10 @@ class ResumeScreeningAPIView(APIView):
             candidate_url = resume_data.get("workday_url", "No link available")
             resume_compensation = resume_data.get("compensation")
             candidate_name = resume_data.get("candidate_name")
+            linkedin_pattern = r"https?://(?:www\.)?linkedin\.com/in/[a-zA-Z0-9-_%]+"
+            match = re.search(linkedin_pattern, resume_text)
+            linkedin_url = match.group(0) if match else "No LinkedIn profile found"
+            print(linkedin_url)
 
             # candidate_name = extract_name_from_text(resume_text)
 
@@ -86,11 +93,30 @@ class ResumeScreeningAPIView(APIView):
             if existing_result:
                serializer = ResumeDetailsSerializer(existing_result)
             else:
+                if linkedin_url != "No LinkedIn profile found":
+                    process = subprocess.Popen(
+                        ['scrapy', 'crawl', 'linkedin', '-a', f'url={linkedin_url}', '-o', 'output.json'],
+                        cwd=r'C:\Users\Mega Computer\Desktop\Resume-Screening\backend\linkedin_scraper',
+                        stdout=subprocess.PIPE, stderr=subprocess.PIPE
+                    )
+                    stdout, stderr = process.communicate()
+                    print(f"Scrapy stdout: {stdout.decode()}")
+                    print(f"Scrapy stderr: {stderr.decode()}")
+                    if process.returncode == 0:
+                        with open(r'C:\Users\Mega Computer\Desktop\Resume-Screening\backend\linkedin_scraper\output.json') as f:
+                            linkedin_data = json.load(f)
+                            experience = linkedin_data[0]['experience'] if linkedin_data else []
+                            f"Srap : {experience}"
+                            
+                    else:
+                         print("Scrapy failed to scrape data.")
+                else:
+                    experience = []
+                    print(f"Empty : {experience}")
             
                 processed_data = process_with_hr_ai(resume_text, jd_results)
                 score = processed_data.get("score", 0)
                 score_reason = processed_data.get("reason", None)
-                print(f"{candidate_name} - {score}")
 
                 if resume_compensation is not None:
                     if resume_compensation > jd_compensation:
@@ -103,20 +129,31 @@ class ResumeScreeningAPIView(APIView):
                     compensation = False
                     compensation_reason = "Candidate's compensation data is not available."
 
-                resume_detail_obj = ResumeDetails.objects.create(
-                    resume=resume_obj,
-                    jd=jd,
-                    candidate_name=candidate_name,
-                    score=score,
-                    score_reason=score_reason,
-                    candidate_application=candidate_url,
-                    flagged=compensation,
-                    flag_type="Compensation",
-                    flag_reason=compensation_reason
-                )
-                serializer = ResumeDetailsSerializer(resume_detail_obj)
+                # resume_detail_obj = ResumeDetails.objects.create(
+                #     resume=resume_obj,
+                #     jd=jd,
+                #     candidate_name=candidate_name,
+                #     score=score,
+                #     score_reason=score_reason,
+                #     candidate_application=candidate_url,
+                #     flagged=compensation,
+                #     flag_type="Compensation",
+                #     flag_reason=compensation_reason
+                # )
+                # serializer = ResumeDetailsSerializer(resume_detail_obj)
+                result = {
+                    "candidate_name":candidate_name,
+                    "score":score,
+                    "score_reason":score_reason,
+                    "candidate_application":candidate_url,
+                    "flagged":compensation,
+                    "flag_type":"Compensation",
+                    "flag_reason":compensation_reason
+                }
 
-            results.append(serializer.data)
+
+            results.append(result)
+            # results.append(serializer.data)
 
         return Response(results, status=status.HTTP_200_OK)
     
