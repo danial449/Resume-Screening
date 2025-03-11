@@ -1,6 +1,0 @@
-_ACCESS_KEY_ID")
-# aws_secret_key = os.getenv("AWS_SECRET_ACCESS_KEY")
-# aws_region = os.getenv("AWS_DEFAULT_REGION")
-# bedrock_model = os.getenv("AWS_BEDROCK_MODEL")
-# inference_profile_arn = os.getenv("AWS_BEDROCK_INFERENCE_PROFILE_ARN")
-# client = boto3.client("bedrock-runtime", region_name="eu-north-1")

@@ -28,7 +28,7 @@ def extract_text_from_xlsx(excel_file_path):
     valid_indices = [index for index in indices if 0 <= index < len(df.columns)]
     result_list = []
     
-    for row_number in range(1, len(df)):
+    for row_number in range(1, 50):
         raw_compensation = df.iloc[row_number, valid_indices[3]] if pd.notna(df.iloc[row_number, valid_indices[3]]) else None  # Column 32
         compensation_match = re.search(r'\d+', str(raw_compensation))  # Extract only numbers
         summary = df.iloc[row_number, valid_indices[2]] if pd.notna(df.iloc[row_number, valid_indices[2]]) else None
