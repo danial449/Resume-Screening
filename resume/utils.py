@@ -7,6 +7,7 @@ import spacy
 import re
 from transformers import pipeline
 import textwrap
+import boto3
 
 client = openai.OpenAI(api_key=settings.OPENAI_API_KEY)
 
@@ -124,33 +125,54 @@ You are an expert Prompt Engineer and Skill Weightage Analyst. Your task is to:
 - *No two skills* should receive the *same weight*.
 - Ensure each justification is *clear, well-structured*, and directly tied to the JD.
 
-When done, provide your final output in the specified format.
-
 """
 
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[{"role": "system", "content": "Extract exactly 10 key skills and assign weightages from a job description."},
-                  {"role": "user", "content": prompt}],
-        temperature=0
-    )
+    # response = client.chat.completions.create(
+    #     model="gpt-4o",
+    #     messages=[{"role": "system", "content": "Extract exactly 10 key skills and assign weightages from a job description."},
+    #               {"role": "user", "content": prompt}],
+    #     temperature=0
+    # )
 
-    if not response.choices or not response.choices[0].message.content.strip():
+    # if not response.choices or not response.choices[0].message.content.strip():
+    #     print("Warning: Empty response from API")
+    #     return []
+
+    # response_text = response.choices[0].message.content.strip()
+
+    client = settings.SESSION.client("bedrock-runtime")
+
+    messages = [
+        {"role": "user", "content": [{"text": prompt}]},
+    ]
+
+    inference_config = {
+    "temperature": 0
+    }
+
+    response = client.converse(
+        modelId=settings.AWS_BEDROCK_MODEL, 
+        messages=messages,
+        inferenceConfig=inference_config
+        )
+
+    if not response["output"] or not response["output"]["message"]["content"][0]["text"].strip():
         print("Warning: Empty response from API")
         return []
 
-    response_text = response.choices[0].message.content.strip()
+    response_text =  response["output"]["message"]["content"][0]["text"].strip()
+    print(response_text)
 
     weighted_skills = []
     lines = response_text.split("\n")
 
     skill_name, weightage, rationale = None, None, ""
     for line in lines:
-        if " - " in line:
+        if "Skill Name - " in line:
             try:
-                skill_name, weight = line.rsplit(" - ", 1)
-                weightage = int(weight.strip())
-                skill_name = skill_name.split(". ", 1)[1]  
+                parts = line.split("Skill Name - ")
+                skill_name = parts[1].rsplit(" - ", 1)[0].strip() 
+                weightage = int(parts[1].rsplit(" - ", 1)[1].strip()) 
             except ValueError:
                 continue  
         elif "Reasoning:" in line:
@@ -163,8 +185,7 @@ When done, provide your final output in the specified format.
                     })
             skill_name, weightage, rationale = None, None, ""  
         elif skill_name and weightage:
-         rationale += " " + line.strip()  
-
+         rationale += " " + line.strip()
     return weighted_skills
 
 def process_with_hr_ai(resume_text, jd_results):
@@ -195,9 +216,15 @@ def process_with_hr_ai(resume_text, jd_results):
     9 (Exceptional): The resume demonstrates superior proficiency in the skill, with multiple examples and clear evidence of exceeding the job description's requirements.
     10 (Outstanding): The resume not only demonstrates mastery of the skill but also showcases exceptional expertise, innovation, or achievements that far surpass the job description's expectations.
 
+    Here is the job description skills data:
+    {jd_results}
+
+    Here is the resume text:
+    {resume_text}
+
     After evaluating each skill, calculate an overall weighted score for the resume based on the skill weightages provided in the job description.
 
-    **Response Format:**
+    **Response strickly this format**
     1. **Overall Weighted Score:** Clearly state the overall weighted score in this format:
        **"Overall Weighted Score: X.X"**
     
@@ -208,37 +235,43 @@ def process_with_hr_ai(resume_text, jd_results):
          **"Candidate matches to the below key skills: Java, AWS, communication, and client handling, with 7+ years of experience in product-based companies."**
        - Do not provide a long explanation or bullet points.
 
-
-    Here is the job description skills data:
-    {jd_results}
-
-    Here is the resume text:
-    {resume_text}
-
-    Perform the analysis as described and provide the output in a clear and structured format.
     """
     
-    response = client.chat.completions.create(
-        model="gpt-4",
-        messages=[
-            {"role": "system", "content": "You are an expert in analyzing job descriptions and resumes."},
-            {"role": "user", "content": prompt}
-        ],
-        temperature=0
-    )
+    # response = client.chat.completions.create(
+    #     model="gpt-4",
+    #     messages=[
+    #         {"role": "system", "content": "You are an expert in analyzing job descriptions and resumes."},
+    #         {"role": "user", "content": prompt}
+    #     ],
+    #     temperature=0
+    # )
 
-    response_text = response.choices[0].message.content.strip()
+    # response_text = response.choices[0].message.content.strip()
+
+    client = settings.SESSION.client("bedrock-runtime")
+
+    messages = [
+        {"role": "user", "content": [{"text": prompt}]},
+    ]
+
+    inference_config = {
+    "temperature": 0
+    }
+
+    response = client.converse(
+        modelId=settings.AWS_BEDROCK_MODEL, 
+        messages=messages,
+        inferenceConfig=inference_config
+        )
+    
+    response_text = response["output"]["message"]["content"][0]["text"].strip()
 
     match = re.search(r"Overall Weighted Score: (\d+\.?\d*)", response_text)
     if match:
         overall_score = float(match.group(1))
     else:
-        match = re.search(r"\b(\d{1,2}(\.\d+)?)\b", response_text)
-        if match:
-            overall_score = float(match.group(1))
-        else:
-            overall_score = 0
-            # raise ValueError("Overall weighted score not found in the response.")
+        overall_score = 0
+        # raise ValueError("Overall weighted score not found in the response.")
 
     reason_match = re.search(r"Reasoning \(Short Summary Format\):(.*?)(?=\n\n|\Z)", response_text, re.DOTALL)
     if reason_match:
