@@ -28,7 +28,7 @@ def extract_text_from_xlsx(excel_file_path):
     valid_indices = [index for index in indices if 0 <= index < len(df.columns)]
     result_list = []
     
-    for row_number in range(1, 50):
+    for row_number in range(1, 2):
         raw_compensation = df.iloc[row_number, valid_indices[3]] if pd.notna(df.iloc[row_number, valid_indices[3]]) else None  # Column 32
         compensation_match = re.search(r'\d+', str(raw_compensation))  # Extract only numbers
         summary = df.iloc[row_number, valid_indices[2]] if pd.notna(df.iloc[row_number, valid_indices[2]]) else None
@@ -286,49 +286,103 @@ def process_with_hr_ai(resume_text, jd_results):
     }
     return score
 
-def is_generated_by_ai(resume_text, chunk_size=500, threshold=0.3, debug=False):
-    if not resume_text or not isinstance(resume_text, str):
-        raise ValueError("Input must be a non-empty string")
+def is_generated_by_ai(resume_text):
+    
+    prompt = f"""
+You are an AI trained to determine whether a given text is human-written or AI-generated. Analyze the following resume text and classify it as either "Human-written" or "AI-generated". Provide only one of these two labels as your response.
 
-    resume_text = resume_text.strip()
-    debug_info = {'chunk_scores': [], 'chunk_labels': []}
+    Resume Text:
+    {resume_text}
 
-    chunks = textwrap.wrap(resume_text, chunk_size, break_long_words=False,
-                          replace_whitespace=False)
+    Instructions:
+    1. Analyze the text for patterns, structure, and language usage.
+    2. Classify the text as "Human-written" or "AI-generated".
+    3. Do not provide any additional explanation or details.
+    """
+    
+    # Call the Bedrock API with the prompt
+    client = settings.SESSION.client("bedrock-runtime")
 
-    if len(chunks) > 1:
-        additional_chunks = []
-        for i in range(len(chunks)-1):
-            overlap = chunks[i][-200:] + chunks[i+1][:200]
-            additional_chunks.append(overlap)
-        chunks.extend(additional_chunks)
+    messages = [
+        {"role": "user", "content": [{"text": prompt}]},
+    ]
 
-    chunk_results = []
+    inference_config = {          
+    "temperature": 0.5,      
+    "topP": 1.0,              
+    }
 
-    for i, chunk in enumerate(chunks):
-        result = text_classifier(chunk)[0]
-        score = result['score']
-        label = result['label']
+    response = client.converse(
+        modelId=settings.AWS_BEDROCK_MODEL, 
+        messages=messages,
+        inferenceConfig=inference_config
+        )
 
-        ai_prob = score if label == "Fake" else 1 - score
-        chunk_results.append(ai_prob)
+    if not response["output"] or not response["output"]["message"]["content"][0]["text"].strip():
+        print("Warning: Empty response from API")
+        return []
 
-        if debug:
-            debug_info['chunk_scores'].append(ai_prob)
-            debug_info['chunk_labels'].append(label)
+    response_text =  response["output"]["message"]["content"][0]["text"].strip()
+    print(response_text)
+    
+    if "Human-written" in response_text:
+        print("Classification: Human-written")
+        classification = "Human-written"
+        confidence = 1.0
+        return classification, confidence
+    elif "AI-generated" in response_text:
+        classification = "Ai-Generated"
+        confidence = 1.0
+        return classification, confidence
+    else:
+        classification = None
+        confidence = 0
+        return classification, confidence
 
-    confidence = max(chunk_results)
-    ai_generated = confidence > threshold
+    
+# def is_generated_by_ai(resume_text, chunk_size=500, threshold=0.3, debug=False):
+#     if not resume_text or not isinstance(resume_text, str):
+#         raise ValueError("Input must be a non-empty string")
 
-    if debug:
-        print("\nDebug Information:")
-        print(f"Number of chunks analyzed: {len(chunks)}")
-        print("\nChunk-by-chunk analysis:")
-        for i, (score, label) in enumerate(zip(debug_info['chunk_scores'],
-                                             debug_info['chunk_labels'])):
-            print(f"Chunk {i+1}: AI Probability: {score:.3f}, Label: {label}")
-        print(f"\nFinal confidence score: {confidence:.3f}")
-        print(f"Threshold: {threshold}")
-        print(f"Final verdict: {'AI-generated' if confidence > threshold else 'Human-written'}")
+#     resume_text = resume_text.strip()
+#     debug_info = {'chunk_scores': [], 'chunk_labels': []}
 
-    return ai_generated, confidence
+#     chunks = textwrap.wrap(resume_text, chunk_size, break_long_words=False,
+#                           replace_whitespace=False)
+
+#     if len(chunks) > 1:
+#         additional_chunks = []
+#         for i in range(len(chunks)-1):
+#             overlap = chunks[i][-200:] + chunks[i+1][:200]
+#             additional_chunks.append(overlap)
+#         chunks.extend(additional_chunks)
+
+#     chunk_results = []
+
+#     for i, chunk in enumerate(chunks):
+#         result = text_classifier(chunk)[0]
+#         score = result['score']
+#         label = result['label']
+
+#         ai_prob = score if label == "Fake" else 1 - score
+#         chunk_results.append(ai_prob)
+
+#         if debug:
+#             debug_info['chunk_scores'].append(ai_prob)
+#             debug_info['chunk_labels'].append(label)
+
+#     confidence = max(chunk_results)
+#     ai_generated = confidence > threshold
+
+#     if debug:
+#         print("\nDebug Information:")
+#         print(f"Number of chunks analyzed: {len(chunks)}")
+#         print("\nChunk-by-chunk analysis:")
+#         for i, (score, label) in enumerate(zip(debug_info['chunk_scores'],
+#                                              debug_info['chunk_labels'])):
+#             print(f"Chunk {i+1}: AI Probability: {score:.3f}, Label: {label}")
+#         print(f"\nFinal confidence score: {confidence:.3f}")
+#         print(f"Threshold: {threshold}")
+#         print(f"Final verdict: {'AI-generated' if confidence > threshold else 'Human-written'}")
+
+#     return ai_generated, confidence

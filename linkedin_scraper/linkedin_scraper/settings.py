@@ -17,7 +17,28 @@ NEWSPIDER_MODULE = "linkedin_scraper.spiders"
 #USER_AGENT = "linkedin_scraper (+http://www.yourdomain.com)"
 
 # Obey robots.txt rules
-ROBOTSTXT_OBEY = True
+# Scrapy settings to bypass LinkedIn restrictions
+ROBOTSTXT_OBEY = False  # Ignore robots.txt
+DOWNLOAD_DELAY = 3  # Delay requests to mimic human behavior
+CONCURRENT_REQUESTS = 1  # Reduce request rate
+
+# Random User-Agent Middleware
+DOWNLOADER_MIDDLEWARES = {
+    "scrapy.downloadermiddlewares.useragent.UserAgentMiddleware": None,
+     'scrapy_user_agents.middlewares.RandomUserAgentMiddleware': 400,
+    "scrapy_fake_useragent.middleware.RandomUserAgentMiddleware": 400,
+    "scrapy.downloadermiddlewares.retry.RetryMiddleware": 90,
+    "scrapy.downloadermiddlewares.httpproxy.HttpProxyMiddleware": 110,
+    "scrapy.downloadermiddlewares.cookies.CookiesMiddleware": 700,
+}
+
+# Use a real User-Agent
+USER_AGENT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+
+# Retry settings to bypass temporary blocks
+RETRY_ENABLED = True
+RETRY_TIMES = 5  # Number of retries
+
 
 # Configure maximum concurrent requests performed by Scrapy (default: 16)
 #CONCURRENT_REQUESTS = 32

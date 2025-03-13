@@ -35,19 +35,26 @@ profile_url = "https://www.linkedin.com/in/lyleompad"
 driver.get(profile_url)
 
 time.sleep(5)
-
-experiences = driver.find_elements(By.CSS_SELECTOR, "#profile-content > div > div.scaffold-layout.scaffold-layout--breakpoint-xl.scaffold-layout--main-aside.scaffold-layout--reflow.pv-profile.pvs-loader-wrapper__shimmer--animate > div > div > main > section:nth-child(3) > div.FYubIvxZOQqUkzQydrTDSUmLkfGNzzGKcyki > ul")
+name = driver.find_element(By.XPATH, '/html/body/div[6]/div[3]/div/div/div[2]/div/div/main/section[1]/div[2]/div[2]/div[1]/div[1]/span/a/h1').text.strip()
+heading = driver.find_element(By.XPATH, '//*[@id="profile-content"]/div/div[2]/div/div/main/section[1]/div[2]/div[2]/div[1]/div[2]').text.strip()
+location = driver.find_element(By.XPATH, '//*[@id="profile-content"]/div/div[2]/div/div/main/section[1]/div[2]/div[2]/div[2]/span[1]').text.strip()
+experiences = driver.find_elements(By.XPATH, '//*[@id="profile-content"]/div/div[2]/div/div/main/section[3]/div[3]/ul')
 
 extracted_experience = []
 for exp in experiences:
     try:
-        title = exp.find_element(By.XPATH, '//*[@id="profile-content"]/div/div[2]/div/div/main/section[3]/div[3]/ul/li[1]/div/div[2]/div[1]/div/div/div/div/div').text.strip()
-        print(f"title : {title}")
-        company = exp.find_element(By.XPATH, '//*[@id="profile-content"]/div/div[2]/div/div/main/section[3]/div[3]/ul/li[1]/div/div[2]/div[2]').text.strip()
-        extracted_experience.append({"title": title, "company": company})
+        title = exp.find_element(By.XPATH, '//*[@id="profile-content"]/div/div[2]/div/div/main/section[3]/div[3]/ul/li[1]/div/div[2]/div[1]/div/div/div/div/div/span[1]').text.strip()
+        company = exp.find_element(By.XPATH, '//*[@id="profile-content"]/div/div[2]/div/div/main/section[3]/div[3]/ul/li[1]/div/div[2]/div[1]/div/span[1]/span[1]').text.strip()
+        total_expereince = exp.find_element(By.XPATH, '//*[@id="profile-content"]/div/div[2]/div/div/main/section[3]/div[3]/ul/li[1]/div/div[2]/div[1]/div/span[2]/span[1]').text.strip()
+        extracted_experience.append({"title": title, "total_experience": total_expereince, "company": company})
     except Exception as e:
         print(f"Error extracting experience: {e}")
+response = {
+    "name" : name,
+    "heading" : heading,
+    "location" : location,
+    "experience" : extracted_experience
 
-print(f"Extracted Experience: {extracted_experience}")
-
+}
+print(response)
 driver.quit()
