@@ -121,7 +121,7 @@ class ResumeScreeningAPIView(APIView):
                         score=score,
                         score_reason=score_reason,
                         candidate_application=candidate_url,
-                        linkedin_url= linkedin_url if linkedin_url != "No LinkedIn profile found" else None,
+                        linkedin_url= True if linkedin_url != "No LinkedIn profile found" else False,
                         flagged=compensation,
                         flag_type="Compensation",
                         flag_reason=compensation_reason
