@@ -28,7 +28,7 @@ def extract_text_from_xlsx(excel_file_path):
     valid_indices = [index for index in indices if 0 <= index < len(df.columns)]
     result_list = []
     
-    for row_number in range(1, 2):
+    for row_number in range(1, 10):
         raw_compensation = df.iloc[row_number, valid_indices[3]] if pd.notna(df.iloc[row_number, valid_indices[3]]) else None  # Column 32
         compensation_match = re.search(r'\d+', str(raw_compensation))  # Extract only numbers
         summary = df.iloc[row_number, valid_indices[2]] if pd.notna(df.iloc[row_number, valid_indices[2]]) else None
@@ -338,51 +338,3 @@ You are an AI trained to determine whether a given text is human-written or AI-g
         classification = None
         confidence = 0
         return classification, confidence
-
-    
-# def is_generated_by_ai(resume_text, chunk_size=500, threshold=0.3, debug=False):
-#     if not resume_text or not isinstance(resume_text, str):
-#         raise ValueError("Input must be a non-empty string")
-
-#     resume_text = resume_text.strip()
-#     debug_info = {'chunk_scores': [], 'chunk_labels': []}
-
-#     chunks = textwrap.wrap(resume_text, chunk_size, break_long_words=False,
-#                           replace_whitespace=False)
-
-#     if len(chunks) > 1:
-#         additional_chunks = []
-#         for i in range(len(chunks)-1):
-#             overlap = chunks[i][-200:] + chunks[i+1][:200]
-#             additional_chunks.append(overlap)
-#         chunks.extend(additional_chunks)
-
-#     chunk_results = []
-
-#     for i, chunk in enumerate(chunks):
-#         result = text_classifier(chunk)[0]
-#         score = result['score']
-#         label = result['label']
-
-#         ai_prob = score if label == "Fake" else 1 - score
-#         chunk_results.append(ai_prob)
-
-#         if debug:
-#             debug_info['chunk_scores'].append(ai_prob)
-#             debug_info['chunk_labels'].append(label)
-
-#     confidence = max(chunk_results)
-#     ai_generated = confidence > threshold
-
-#     if debug:
-#         print("\nDebug Information:")
-#         print(f"Number of chunks analyzed: {len(chunks)}")
-#         print("\nChunk-by-chunk analysis:")
-#         for i, (score, label) in enumerate(zip(debug_info['chunk_scores'],
-#                                              debug_info['chunk_labels'])):
-#             print(f"Chunk {i+1}: AI Probability: {score:.3f}, Label: {label}")
-#         print(f"\nFinal confidence score: {confidence:.3f}")
-#         print(f"Threshold: {threshold}")
-#         print(f"Final verdict: {'AI-generated' if confidence > threshold else 'Human-written'}")
-
-#     return ai_generated, confidence

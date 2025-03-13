@@ -26,6 +26,7 @@ class ResumeDetails(models.Model):
     score = models.IntegerField()
     score_reason = models.TextField(null=True, blank=True)
     candidate_application = models.URLField(max_length=255, null=True, blank=True)
+    linkedin_url = models.URLField(max_length=255, null=True, blank=True)
     flagged = models.BooleanField(null=True, blank=True)
     flag_type = models.CharField(max_length=255)
     flag_reason = models.TextField()

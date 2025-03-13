@@ -23,4 +23,4 @@ class ResumeDetailsSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = ResumeDetails
-        fields = ["id", "filename", "jd_filename", "candidate_name", "score", "score_reason", "candidate_application", "flagged", "flag_type", "flag_reason"]
+        fields = ["id", "filename", "jd_filename", "candidate_name", "score", "score_reason", "candidate_application", "linkedin_url", "flagged", "flag_type", "flag_reason"]
