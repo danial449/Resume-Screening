@@ -3,8 +3,8 @@ from rest_framework.response import Response
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from .models import JobDescription, JDResult, Resume, ResumeDetails
-from .serializers import JobDescriptionSerializer, JDResultSerializer, ResumeSerializer, ResumeDetailsSerializer
+from .models import JobDescription, JDResult, Resume, ResumeDetails, JDResultChangeLog
+from .serializers import JobDescriptionSerializer, JDResultSerializer, ResumeSerializer, ResumeDetailsSerializer, JDResultChangeLogSerializer
 from .utils import extract_text_from_pdf, extract_text_from_doc, assign_weightage_to_skills, extract_name_from_text, extract_text_from_xlsx, process_with_hr_ai, is_generated_by_ai
 from rest_framework.decorators import api_view, permission_classes
 from rest_framework.permissions import AllowAny
@@ -47,22 +47,58 @@ class JobDescriptionUploadView(APIView):
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
 
-class JDResultUpdateView(APIView):
-    def put(self, request, jd_id):
-        jd = get_object_or_404(JobDescription, id=jd_id)
-        results = request.data.get("results", [])
+# class JDResultUpdateView(APIView):
+#     def put(self, request, jd_id):
+#         jd = get_object_or_404(JobDescription, id=jd_id)
+#         skills = request.data.get("skills", [])
+#         print(skills)
+#         changed_by = "API User"  
 
-        for result in results:
-            jd_result, created = JDResult.objects.update_or_create(
-                jd=jd, skill=result["skill"], 
-                defaults={
-                    "score": result.get("score"),
-                    "hr_comment": result.get("hr_comment"),
-                    "rationale": result.get("rationale"),
-                }
-            )
-        serializer = JobDescriptionSerializer(jd)
-        return Response(serializer.data, status=status.HTTP_200_OK)
+#         jd_results = JDResult.objects.filter(jd=jd)
+#         if not jd_results.exists():
+#             return Response({"error": "No JD results found for this Job Description"}, status=status.HTTP_400_BAD_REQUEST)
+
+#         for result in skills:
+#             jd_result, created = JDResult.objects.get_or_create(
+#                 jd=jd, skill=result["id"]
+#             )
+#             print(jd_result)
+#             if not created:
+#                 changes = {}
+#                 if "score" in result and jd_result.score != result["score"]:
+#                     changes["score"] = {
+#                         "previous": jd_result.score,
+#                         "updated": result["score"],
+#                     }
+#                 if "hr_comment" in result and jd_result.hr_comment != result["hr_comment"]:
+#                     changes["hr_comment"] = {
+#                         "previous": jd_result.hr_comment,
+#                         "updated": result["hr_comment"],
+#                     }
+#                 if "rationale" in result and jd_result.rationale != result["rationale"]:
+#                     changes["rationale"] = {
+#                         "previous": jd_result.rationale,
+#                         "updated": result["rationale"],
+#                     }
+
+#                 if changes:
+#                     JDResultChangeLog.objects.create(
+#                         jd_result=jd_result,
+#                         changed_by=changed_by,
+#                         changes=changes, 
+#                     )
+
+#             # Update the JDResult instance
+#             if "score" in result:
+#                 jd_result.score = result["score"]
+#             if "hr_comment" in result:
+#                 jd_result.hr_comment = result["hr_comment"]
+#             if "rationale" in result:
+#                 jd_result.rationale = result["rationale"]
+#             jd_result.save()
+
+#         serializer = JobDescriptionSerializer(jd)
+#         return Response(serializer.data, status=status.HTTP_200_OK)
     
 class ResumeScreeningAPIView(APIView):
     def post(self, request, jd_id):
@@ -121,23 +157,13 @@ class ResumeScreeningAPIView(APIView):
                         score=score,
                         score_reason=score_reason,
                         candidate_application=candidate_url,
-                        linkedin_url= True if linkedin_url != "No LinkedIn profile found" else False,
-                        flagged=compensation,
+                        linkedin_flag=True if linkedin_url != "No LinkedIn profile found" else False,
+                        linkedin_url=linkedin_url if linkedin_url else "No LinkedIn Profile",
+                        compensation_flag=compensation,
                         flag_type="Compensation",
                         flag_reason=compensation_reason
                     )
                     serializer = ResumeDetailsSerializer(resume_detail_obj)
-                    # result = {
-                    #     "candidate_name":candidate_name,
-                    #     "score":score,
-                    #     "score_reason":score_reason,
-                    #     "candidate_application":candidate_url,
-                    #     "flagged":compensation,
-                    #     "flag_type":"Compensation",
-                    #     "flag_reason":compensation_reason
-                    # }
-
-
                     if not isinstance(serializer.data, (dict, list)):
                         raise TypeError(f"Serializer data is not JSON-serializable: {serializer.data}")
 
@@ -188,7 +214,34 @@ class ResumeScreeningAPIView(APIView):
         return Response(updated_results, status=status.HTTP_200_OK)
 
 
+class JDResultUpdateView(APIView):
+    def put(self, request, jd_id):
+        jd = get_object_or_404(JobDescription, id=jd_id)
+        results = request.data.get("skills", [])
 
+        for result in results:
+            jd_result, created = JDResult.objects.get_or_create(
+                jd=jd, skill=result["skill"]
+            )
+            if not created:
+                # Log changes before updating
+                JDResultChangeLog.objects.create(
+                    jd_result=jd_result,
+                    previous_score=jd_result.score,
+                    updated_score=result.get("score"),
+                    previous_hr_comment=jd_result.hr_comment,
+                    updated_hr_comment=result.get("hr_comment"),
+                    previous_rationale=jd_result.rationale,
+                    updated_rationale=result.get("rationale"),
+                )
+            # Update the JDResult instance
+            jd_result.score = result.get("score", jd_result.score)
+            jd_result.hr_comment = result.get("hr_comment", jd_result.hr_comment)
+            jd_result.rationale = result.get("rationale", jd_result.rationale)
+            jd_result.save()
+
+        serializer = JobDescriptionSerializer(jd)
+        return Response(serializer.data, status=status.HTTP_200_OK)
 @api_view(["GET"])
 @permission_classes([AllowAny])
 def check_ai_resume(request):
@@ -207,3 +260,11 @@ def check_ai_resume(request):
         }
         results.append(result)
     return Response(results , status=status.HTTP_200_OK)
+
+@api_view(["GET"])
+@permission_classes([AllowAny])
+def ChangeHistoryLog(request):
+    historylog = JDResultChangeLog.objects.all()
+    print(historylog)
+    serializer = JDResultChangeLogSerializer(historylog, many=True)
+    return Response(serializer.data, status=status.HTTP_200_OK)

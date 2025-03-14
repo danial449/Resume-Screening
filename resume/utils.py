@@ -73,6 +73,7 @@ You are an expert Prompt Engineer and Skill Weightage Analyst. Your task is to:
    - How frequently each skill is mentioned in the JD.
    - Its direct impact on the role’s key responsibilities.
    - Its significance to overall job performance and success.
+   - Analyze the given skills and categorize them as either Mandatory or Preferred based on their relevance, necessity in the JD  
 
 3. Assign a *unique weightage* (1–10) to each skill using the following **exact definitions**:
 
@@ -115,9 +116,11 @@ You are an expert Prompt Engineer and Skill Weightage Analyst. Your task is to:
 
    1. Skill Name - 10  
       Reasoning: [Highlight frequency, relevance, and why it's indispensable]
+      Category: [Mandatory or Preferred]
 
    2. Skill Name - 9  
       Reasoning: [Highlight frequency, relevance, and why it's crucial but slightly less than 10]
+      Category: [Mandatory or Preferred]
 
    ...
 
@@ -161,12 +164,11 @@ You are an expert Prompt Engineer and Skill Weightage Analyst. Your task is to:
         return []
 
     response_text =  response["output"]["message"]["content"][0]["text"].strip()
-    print(response_text)
 
     weighted_skills = []
     lines = response_text.split("\n")
 
-    skill_name, weightage, rationale = None, None, ""
+    skill_name, weightage, rationale, category = None, None, "", ""
     for line in lines:
         if "Skill Name - " in line:
             try:
@@ -177,11 +179,14 @@ You are an expert Prompt Engineer and Skill Weightage Analyst. Your task is to:
                 continue  
         elif "Reasoning:" in line:
             rationale = line.replace("Reasoning:", "").strip()
+        elif "Category:" in line:
+            category = line.replace("Category:", "").strip()
             if skill_name and weightage:
                 weighted_skills.append({
                     "skill": skill_name,
                     "score": weightage,
-                    "rationale": rationale
+                    "rationale": rationale,
+                    "category": category
                     })
             skill_name, weightage, rationale = None, None, ""  
         elif skill_name and weightage:
